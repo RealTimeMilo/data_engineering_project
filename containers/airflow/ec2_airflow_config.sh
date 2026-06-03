@@ -1,0 +1,1 @@
+export DAG_BUNDLE_CONFIG_LIST='[{"name": "git_dags", "classpath": "airflow.providers.git.bundles.git.GitDagBundle", "kwargs": {"git_conn_id": "my_git_connection", "tracking_ref": "main", "subdir": "dags", "refresh_interval": 300}}]'

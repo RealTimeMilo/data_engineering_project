@@ -7,4 +7,6 @@ COPY requirements.txt /
 USER airflow
 RUN pip install --no-cache-dir -r /requirements.txt
 
+COPY ec2_airflow_config.sh /
+RUN cd / && bash /ec2_airflow_config.sh
 ENV DAG_BUNDLE_CONFIG_LIST='[{"name": "git_dags", "classpath": "airflow.providers.git.bundles.git.GitDagBundle", "kwargs": {"git_conn_id": "my_git_connection", "tracking_ref": "main", "subdir": "dags", "refresh_interval": 300}}]'
