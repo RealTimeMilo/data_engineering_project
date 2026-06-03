@@ -6,8 +6,7 @@ RUN pip install --no-cache-dir -r /requirements.txt
 COPY quarto.sh /
 RUN cd / && bash /quarto.sh
 RUN bash /tmp/quarto.sh \
-    && rm -f ~/quarto-*.tar.gz /tmp/quarto.sh
-    # The below helps to keep the image size down
+    && rm -f ~/quarto-*.tar.gz /tmp/quarto.sh \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

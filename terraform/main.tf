@@ -155,13 +155,13 @@ resource "aws_security_group" "sde_security_group" {
     security_groups = [aws_security_group.alb.id]
   }
 
-    ingress {
-    description = "Inbound HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
+  #   ingress {
+  #   description = "Inbound HTTPS"
+  #   from_port   = 443
+  #   to_port     = 443
+  #   protocol    = "tcp"
+  #   security_groups = [aws_security_group.alb.id]
+  # }
 
   tags = {
     Name = "sde_security_group"
@@ -366,7 +366,7 @@ resource "aws_instance" "sde_ec2" {
   ]
 
   tags = {
-    Name = "airflow_ec2.0"
+    Name = "airflow_ec2"
     Environment = var.environment
   }
 
