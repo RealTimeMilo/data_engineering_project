@@ -21,5 +21,3 @@ rudderstack-airflow-provider
 apache-airflow-providers-datadog==3.10.4
 apache-airflow-providers-git==0.4.0
 dag-factory==1.1.0
-pandas==2.2.2
-pyspark==3.5.1
