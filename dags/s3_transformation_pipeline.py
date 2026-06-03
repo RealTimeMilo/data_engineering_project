@@ -23,7 +23,6 @@ import logging
 from datetime import datetime, timedelta
 
 import pandas as pd
-<<<<<<< HEAD
 from airflow.decorators import task
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.slack.operators.slack_webhook import \
@@ -34,16 +33,6 @@ from airflow.sdk import Variable
 
 from airflow import DAG
 
-=======
-
-from airflow import DAG
-from airflow.decorators import task
-from airflow.sdk import Variable
-from airflow.providers.standard.operators.empty import EmptyOperator
-from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from airflow.providers.slack.operators.slack_webhook import SlackWebhookOperator
-from airflow.providers.smtp.operators.smtp import EmailOperator
->>>>>>> origin/main
 # from airflow.providers.papermill.operators.papermill import PapermillOperator
 
 SLACK_WEBHOOK_URL = Variable.get("slack_webhook_url")
@@ -212,15 +201,11 @@ with DAG(
 
     @task(task_id="transform_enrich_papermill")
     def transform_enrich_papermill(payload: dict) -> dict:
-<<<<<<< HEAD
         import json
         import os
         import tempfile
 
         import papermill as pm
-=======
-        import tempfile, json, papermill as pm, os
->>>>>>> origin/main
 
         # 1️⃣ Write payload to a temp file (papermill handles large dicts better this way)
         payload_file = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)

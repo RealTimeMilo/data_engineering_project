@@ -1,14 +1,9 @@
 from datetime import datetime, timedelta
 
-<<<<<<< HEAD
 from airflow.operators.bash import BashOperator
 
 from airflow import DAG
 
-=======
-from airflow import DAG
-from airflow.operators.bash import BashOperator
->>>>>>> origin/main
 with DAG(
     "current_build",
     description="Print the current build loaded to the worker",
