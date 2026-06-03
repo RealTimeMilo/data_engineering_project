@@ -11,7 +11,6 @@ types-requests==2.32.0.20240602
 cuallee==0.10.3
 PyYAML>=6.0.1
 sqlalchemy>=1.4.49
-polars==0.20.31
 apache-airflow-providers-slack
 apache-airflow-providers-databricks
 apache-airflow-providers-dbt-cloud==4.7.0
@@ -19,8 +18,8 @@ airflow-provider-mlflow==1.1.0
 airflow-provider-hightouch==4.0.0
 airflow-provider-fivetran-async==2.2.0
 rudderstack-airflow-provider
-dag-factory==1.1.0
-pandas==3.0.3
 apache-airflow-providers-datadog==3.10.4
-pyspark==4.1.2
 apache-airflow-providers-git==0.4.0
+dag-factory==1.1.0
+pandas==2.2.2
+pyspark==3.5.1
