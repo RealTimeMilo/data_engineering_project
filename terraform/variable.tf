@@ -18,11 +18,11 @@ variable "environment" {
 }
 
 ## Networking
-variable "vpc_cidr" {
-  description = "VPC CIDR block"
-  type        = string
-  default     = "10.20.0.0/16"
-}
+# variable "vpc_cidr" {
+#   description = "VPC CIDR block"
+#   type        = string
+#   default     = "10.20.0.0/16"
+# }
 
 variable "airflow_port" {
   description = "Airflow webserver port behind the ALB"
@@ -34,7 +34,7 @@ variable "airflow_port" {
 variable "domain_name" {
   description = "FQDN for Airflow (e.g. airflow.example.com). Empty disables Route53/HTTPS."
   type        = string
-  default     = "data-platform-airflow"
+  default     = "data-platform-airflow.ohmilo.com"
 }
 
 variable "route53_zone_id" {
@@ -72,7 +72,7 @@ variable "waf_rate_limit" {
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t3.medium"
+  default     = "t3.large"
 }
 
 variable "repo_url" {

@@ -34,7 +34,7 @@ resource "aws_lb_target_group" "airflow" {
     unhealthy_threshold = 3
     interval            = 30
     timeout             = 5
-    path                = "/health"
+    path                = "/api/v2/monitor/health"
     matcher             = "200-399"
   }
 
