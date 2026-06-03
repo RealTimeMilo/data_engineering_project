@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars and customize.
+
+# Route53 + HTTPS (optional). Leave empty to use ALB DNS over HTTP.
+# domain_name     = "airflow.example.com"
+
+# Restrict SSH (recommended)
+# admin_cidr_blocks = ["YOUR.PUBLIC.IP/32"]

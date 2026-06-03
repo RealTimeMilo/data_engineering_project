@@ -1,0 +1,26 @@
+dag_id: ml_training_pipeline
+schedule_interval: '@weekly'
+default_args:
+  owner: ml_team
+  retries: 2
+
+tasks:
+  - task_id: extract_data
+    operator: PythonOperator
+    python_callable: extract_from_snowflake
+    params:
+      query: "SELECT * FROM training_data"
+
+  - task_id: train_model
+    operator: KubernetesPodOperator
+    image: my-registry/ml-training:latest
+    arguments: ["--epochs", "50", "--lr", "0.001"]
+    resources:
+      request_cpu: "4"
+      request_mem: "16Gi"
+    dependencies: [extract_data]
+
+  - task_id: evaluate_model
+    operator: PythonOperator
+    python_callable: evaluate_metrics
+    dependencies: [train_model]

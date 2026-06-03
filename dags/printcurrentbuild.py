@@ -1,0 +1,27 @@
+from datetime import datetime, timedelta
+
+<<<<<<< HEAD
+from airflow.operators.bash import BashOperator
+
+from airflow import DAG
+
+=======
+from airflow import DAG
+from airflow.operators.bash import BashOperator
+>>>>>>> origin/main
+with DAG(
+    "current_build",
+    description="Print the current build loaded to the worker",
+    schedule="*/5 * * * *",
+    start_date=datetime(2022, 6, 10),
+    default_args={
+        "owner": "Data Platform Orchestration",
+    },
+    catchup=True,
+    is_paused_upon_creation=False,
+) as dag:
+
+    t1 = BashOperator(
+        task_id="print_current_build",
+        bash_command="ls -la /opt/airflow/",
+    )

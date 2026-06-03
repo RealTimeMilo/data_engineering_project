@@ -1,0 +1,28 @@
+# Pipelines loaded at DAG-parse time by dynamic_coincap_dags.py
+# SQL registry (pipeline_config.pipelines) overrides YAML rows with the same id.
+# Add SQL-only pipelines via migrations/001_pipeline_registry.sql
+
+pipelines:
+  - id: exchanges
+    description: CoinCap exchanges API
+    endpoint: exchanges
+    schedule: "0 6 * * *"
+    quality_column: name
+    render_dashboard: true
+    enabled: true
+
+  - id: assets
+    description: CoinCap assets API
+    endpoint: assets
+    schedule: "0 7 * * *"
+    quality_column: name
+    render_dashboard: false
+    enabled: true
+
+  - id: markets
+    description: CoinCap markets API
+    endpoint: markets
+    schedule: "0 8 * * *"
+    quality_column: exchangeId
+    render_dashboard: false
+    enabled: true

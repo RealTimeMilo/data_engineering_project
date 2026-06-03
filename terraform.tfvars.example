@@ -1,0 +1,50 @@
+# Example terraform.tfvars file
+# Copy this to terraform.tfvars and customize for your environment
+
+# General Configuration
+aws_region   = "us-east-1"
+project_name = "myproject"
+environment  = "dev"
+
+# Networking Configuration
+vpc_cidr                     = "10.0.0.0/16"
+private_data_subnet_az1_cidr = "10.0.10.0/24"
+private_data_subnet_az2_cidr = "10.0.11.0/24"
+
+# Security Configuration
+# Allow access from your VPC CIDR or specific application subnets
+allowed_cidr_blocks = ["10.0.0.0/16"]
+# Or allow access from specific security groups (e.g., application servers)
+# allowed_security_group_ids = ["sg-xxxxxxxxx"]
+
+# RDS Configuration
+database_instance_identifier = "myproject-dev-postgres"
+database_instance_class      = "db.t3.micro"
+engine_version               = "14"
+multi_az_deployment          = false # Set to true for production
+
+# Storage
+allocated_storage     = 200
+max_allocated_storage = 1000
+storage_type          = "gp3"
+storage_encrypted     = true
+
+# Database
+db_name     = "myappdb"
+db_username = "dbadmin"
+db_password = "ChangeMe123!" # Use AWS Secrets Manager in production
+
+# Network
+publicly_accessible = false # Set to true only if needed (not recommended)
+
+# Backup
+backup_retention_period = 7
+skip_final_snapshot     = true # Set to false for production
+
+# Monitoring
+performance_insights_enabled = true
+monitoring_interval          = 60
+
+# Protection
+deletion_protection        = false # Set to true for production
+auto_minor_version_upgrade = true
