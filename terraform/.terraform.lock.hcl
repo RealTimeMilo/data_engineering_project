@@ -1,7 +1,6 @@
 # This file is maintained automatically by "terraform init".
 # Manual edits may be lost in future updates.
 
-<<<<<<< HEAD
 provider "registry.terraform.io/cyrilgdn/postgresql" {
   version     = "1.26.0"
   constraints = "~> 1.22"
@@ -45,8 +44,6 @@ provider "registry.terraform.io/datadog/datadog" {
   ]
 }
 
-=======
->>>>>>> origin/main
 provider "registry.terraform.io/hashicorp/aws" {
   version     = "5.100.0"
   constraints = "~> 5.0"
@@ -70,7 +67,6 @@ provider "registry.terraform.io/hashicorp/aws" {
   ]
 }
 
-<<<<<<< HEAD
 provider "registry.terraform.io/hashicorp/random" {
   version     = "3.9.0"
   constraints = "~> 3.5"
@@ -116,10 +112,6 @@ provider "registry.terraform.io/hashicorp/time" {
 provider "registry.terraform.io/hashicorp/tls" {
   version     = "4.3.0"
   constraints = "~> 4.0"
-=======
-provider "registry.terraform.io/hashicorp/tls" {
-  version = "4.3.0"
->>>>>>> origin/main
   hashes = [
     "h1:5bCU/c+2HUh7GhclzNSH6gAuoCS4inW3obEtRAwu6WQ=",
     "zh:0ab58d6f8991d436c7d2dbd89ed814709b949b07ac5a54ee53b0aec1fa772a8b",
@@ -137,7 +129,6 @@ provider "registry.terraform.io/hashicorp/tls" {
     "zh:f569b65999264a9416862bca5cd2a6177d94ccb0424f3a4ef424428912b9cb3c",
   ]
 }
-<<<<<<< HEAD
 
 provider "registry.terraform.io/integrations/github" {
   version     = "6.12.1"
@@ -160,5 +151,3 @@ provider "registry.terraform.io/integrations/github" {
     "zh:fe79d2a861fb9af420fa5bd7f02c031b2a0a3edf5dbc46022c8ecc7a33cf2b6d",
   ]
 }
-=======
->>>>>>> origin/main
