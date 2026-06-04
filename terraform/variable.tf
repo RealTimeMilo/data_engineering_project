@@ -72,7 +72,7 @@ variable "waf_rate_limit" {
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t3.large"
+  default     = "t3.medium"
 }
 
 variable "repo_url" {
