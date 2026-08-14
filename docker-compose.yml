@@ -1,6 +1,6 @@
 x-airflow-common:
   &airflow-common
-  image: ${AIRFLOW_IMAGE_NAME:-local/airflow:3.2.1}
+  image: ${AIRFLOW_IMAGE_NAME:-local/airflow:3.2.2}
   build:
     context: ./containers/airflow/  
   env_file:
