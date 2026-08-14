@@ -4,8 +4,6 @@ from airflow import DAG
 from airflow.models import Variable
 from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
 
-from dags.preprocessing import AWS_REGION
-
 CLUSTER = Variable.get("ECS_CLUSTER", default_var="mlops-cluster")
 TASK_DEFINITION = Variable.get("ECS_TASK_DEFINITION", default_var="nginx")
 CONTAINER_NAME = Variable.get("ECS_CONTAINER_NAME", default_var="nginx")
