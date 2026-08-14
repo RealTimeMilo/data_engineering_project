@@ -4,11 +4,14 @@ from airflow import DAG
 from airflow.models import Variable
 from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
 
+from dags.preprocessing import AWS_REGION
+
 CLUSTER = Variable.get("ECS_CLUSTER", default_var="mlops-cluster")
 TASK_DEFINITION = Variable.get("ECS_TASK_DEFINITION", default_var="nginx")
 CONTAINER_NAME = Variable.get("ECS_CONTAINER_NAME", default_var="nginx")
 # SUBNETS = Variable.get("ECS_SUBNET_IDS", default_var="subnet-xxxxxxxx").split(",")
 # SECURITY_GROUP = Variable.get("ECS_SECURITY_GROUP", default_var="sg-xxxxxxxx")
+AWS_REGION = Variable.get("AWS_REGION", default_var="us-east-2")
 
 NETWORK_CONFIG = {
     "awsvpcConfiguration": {
@@ -30,6 +33,7 @@ with DAG(
     run_nginx = EcsRunTaskOperator(
         task_id="nginx",
         aws_conn_id="aws_default",
+        region_name=AWS_REGION,
         cluster=CLUSTER,
         task_definition=TASK_DEFINITION,
         launch_type="FARGATE",
