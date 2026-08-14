@@ -41,7 +41,7 @@ with DAG(
                 {
                     "name": CONTAINER_NAME,
                     # Validates nginx config and exits; use the task definition CMD to run nginx normally.
-                    "command": ["nginx", "-t"],
+                    "command": ["nginx", "-g", "daemon off;"],
                 },
             ],
         },
