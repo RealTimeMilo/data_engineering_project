@@ -83,3 +83,7 @@ docker-compdose.yaml
 .git
 rdsfake.tf
 postgres.py
+
+global-bundle.pem
+private_key.pem
+/terraform
