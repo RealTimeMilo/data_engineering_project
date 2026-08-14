@@ -7,14 +7,14 @@ from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
 CLUSTER = Variable.get("ECS_CLUSTER", default_var="mlops-cluster")
 TASK_DEFINITION = Variable.get("ECS_TASK_DEFINITION", default_var="nginx")
 CONTAINER_NAME = Variable.get("ECS_CONTAINER_NAME", default_var="nginx")
-# SUBNETS = Variable.get("ECS_SUBNET_IDS", default_var="subnet-xxxxxxxx").split(",")
-# SECURITY_GROUP = Variable.get("ECS_SECURITY_GROUP", default_var="sg-xxxxxxxx")
+SUBNETS = Variable.get("ECS_SUBNET_IDS", default_var="subnet-0d411eb73b7ec496e").split(",")
+SECURITY_GROUP = Variable.get("ECS_SECURITY_GROUP", default_var="sg-0518ad220f2f46de7")
 AWS_REGION = Variable.get("AWS_REGION", default_var="us-east-2")
 
 NETWORK_CONFIG = {
     "awsvpcConfiguration": {
-        # "subnets": SUBNETS,
-        # "securityGroups": [SECURITY_GROUP],
+        "subnets": SUBNETS,
+        "securityGroups": [SECURITY_GROUP],
         "assignPublicIp": "ENABLED",
     }
 }
