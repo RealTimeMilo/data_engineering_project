@@ -7,7 +7,7 @@ from airflow import DAG
 with DAG(
     "current_build",
     description="Print the current build loaded to the worker",
-    schedule="0 * * * *",
+    schedule=None,
     start_date=datetime(2022, 6, 10),
     default_args={
         "owner": "Data Platform Orchestration",
