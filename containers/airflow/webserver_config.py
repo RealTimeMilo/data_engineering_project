@@ -94,7 +94,9 @@ if WORKOS_ENABLED:
         remote_app = {
             "client_id": CLIENT_ID,
             "client_secret": CLIENT_SECRET,
-            "authorize_url": "https://api.workos.com/user_management/authorize",
+            # provider=authkit selects the AuthKit (hosted UI) flow; without a
+            # connection selector WorkOS returns invalid_connection_selector.
+            "authorize_url": "https://api.workos.com/user_management/authorize?provider=authkit",
             "access_token_url": "https://api.workos.com/user_management/authenticate",
             "api_base_url": "https://api.workos.com/user_management/",
             "request_token_url": None,
