@@ -6,14 +6,17 @@ AppBuilder (FAB) auth manager. When WorkOS is not configured it falls back to
 the default local database auth, so the existing ``airflow`` / ``airflow``
 login keeps working out of the box.
 
-Enable SSO by setting these (shell env, ``.env``, or SSM Parameter Store):
+Enable SSO by setting (shell env, ``.env``, or SSM Parameter Store):
 
     WORKOS_CLIENT_ID          AuthKit application client id
     WORKOS_CLIENT_SECRET      AuthKit application client secret
-    WORKOS_AUTHKIT_DOMAIN     e.g. https://your-app.authkit.app
 
 Optional:
 
+    WORKOS_USE_OIDC           "true" to use the OIDC endpoints on the AuthKit
+                              domain instead of WorkOS's generic endpoints.
+    WORKOS_AUTHKIT_DOMAIN     e.g. https://your-app.authkit.app (required when
+                              WORKOS_USE_OIDC=true)
     WORKOS_SSO_PROVIDER_NAME  provider id used in the callback URL (default: workos)
     WORKOS_DEFAULT_ROLE       FAB role granted to new users (default: Viewer)
     WORKOS_ADMIN_EMAILS       comma-separated emails granted the Admin role
@@ -21,6 +24,8 @@ Optional:
 Redirect URI to register on the WorkOS AuthKit application:
 
     <AIRFLOW__API__BASE_URL>/auth/oauth-authorized/<WORKOS_SSO_PROVIDER_NAME>
+
+Note: WorkOS requires the redirect URI to be HTTPS, except ``http://127.0.0.1``.
 
 This file is mounted into the EC2 Airflow by docker-compose
 (see ``docker-compose.yml``); the ECS Airflow image is not affected.
@@ -55,7 +60,19 @@ ADMIN_EMAILS = {
     if email.strip()
 }
 
-WORKOS_ENABLED = bool(CLIENT_ID and CLIENT_SECRET and AUTHKIT_DOMAIN)
+# WorkOS exposes AuthKit two ways:
+#   * generic: https://api.workos.com/user_management/{authorize,authenticate}
+#              (accepts the environment's client_id directly - the default)
+#   * OIDC:    https://<authkit_domain>/oauth2/{authorize,token,userinfo}
+#              (opt in with WORKOS_USE_OIDC=true; requires the domain to know
+#               the client)
+USE_OIDC = os.getenv("WORKOS_USE_OIDC", "false").strip().lower() in (
+    "1", "true", "yes", "on",
+)
+
+WORKOS_ENABLED = bool(CLIENT_ID and CLIENT_SECRET) and (
+    AUTHKIT_DOMAIN if USE_OIDC else True
+)
 
 if WORKOS_ENABLED:
     AUTH_TYPE = AUTH_OAUTH
@@ -64,20 +81,32 @@ if WORKOS_ENABLED:
     AUTH_ROLES_SYNC_AT_LOGIN = True
     AUTH_ROLES_MAPPING = {DEFAULT_ROLE: [DEFAULT_ROLE], "Admin": ["Admin"]}
 
+    if USE_OIDC and AUTHKIT_DOMAIN:
+        remote_app = {
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "server_metadata_url": f"{AUTHKIT_DOMAIN}/.well-known/openid-configuration",
+            "api_base_url": f"{AUTHKIT_DOMAIN}/oauth2/",
+            "request_token_url": None,
+            "client_kwargs": {"scope": "openid profile email"},
+        }
+    else:
+        remote_app = {
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "authorize_url": "https://api.workos.com/user_management/authorize",
+            "access_token_url": "https://api.workos.com/user_management/authenticate",
+            "api_base_url": "https://api.workos.com/user_management/",
+            "request_token_url": None,
+            "client_kwargs": {"scope": "openid profile email"},
+        }
+
     OAUTH_PROVIDERS = [
         {
             "name": PROVIDER_NAME,
             "icon": "fa-key",
             "token_key": "access_token",
-            "remote_app": {
-                "client_id": CLIENT_ID,
-                "client_secret": CLIENT_SECRET,
-                # WorkOS Connect / AuthKit speak standard OIDC discovery.
-                "server_metadata_url": f"{AUTHKIT_DOMAIN}/.well-known/openid-configuration",
-                "api_base_url": f"{AUTHKIT_DOMAIN}/oauth2/",
-                "client_kwargs": {"scope": "openid profile email"},
-                "request_token_url": None,
-            },
+            "remote_app": remote_app,
         }
     ]
 
@@ -88,18 +117,23 @@ if WORKOS_ENABLED:
             if provider != PROVIDER_NAME:
                 return super().get_oauth_user_info(provider, response)
 
-            # Fetch the OIDC userinfo document for the freshly issued token.
-            remote = self.appbuilder.sm.oauth_remotes[provider]
-            data = remote.get("userinfo").json()
+            # Generic flow: WorkOS returns the user on the token response.
+            data = {}
+            if isinstance(response, dict):
+                data = response.get("user") or {}
+            # OIDC flow: fetch the userinfo document for the issued token.
+            if not data:
+                remote = self.appbuilder.sm.oauth_remotes[provider]
+                data = remote.get("userinfo").json()
 
             email = (data.get("email") or "").lower()
             role_keys = ["Admin"] if email and email in ADMIN_EMAILS else [DEFAULT_ROLE]
 
             return {
-                "username": "workos_" + (data.get("sub") or email or "user"),
+                "username": "workos_" + (data.get("id") or data.get("sub") or email or "user"),
                 "email": email,
-                "first_name": data.get("given_name") or data.get("first_name") or "",
-                "last_name": data.get("family_name") or data.get("last_name") or "",
+                "first_name": data.get("first_name") or data.get("given_name") or "",
+                "last_name": data.get("last_name") or data.get("family_name") or "",
                 "role_keys": role_keys,
             }
 
