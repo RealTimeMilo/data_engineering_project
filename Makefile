@@ -102,6 +102,37 @@ ecs-airflow-vars:
 	bash scripts/set_airflow_vars.sh
 
 ####################################################################################################################
+# EC2 Airflow (the docker-compose instance) — these targets act ONLY on the EC2 box
+
+EC2_AWS_REGION ?= us-east-2
+EC2_REPO_DIR ?= data_engineering_project
+
+# Pull latest main on the EC2 instance and rebuild + restart Airflow there.
+ec2-airflow-deploy:
+	terraform -chdir=./terraform output -raw private_key > private_key.pem && chmod 600 private_key.pem
+	ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i private_key.pem ubuntu@$$(terraform -chdir=./terraform output -raw ec2_public_dns) \
+		'cd $(EC2_REPO_DIR) && sudo git fetch origin main && sudo git reset --hard origin/main && sudo make up'
+	rm -f private_key.pem
+
+# Restart the EC2 Airflow containers (no image rebuild).
+ec2-airflow-restart:
+	terraform -chdir=./terraform output -raw private_key > private_key.pem && chmod 600 private_key.pem
+	ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i private_key.pem ubuntu@$$(terraform -chdir=./terraform output -raw ec2_public_dns) \
+		'cd $(EC2_REPO_DIR) && sudo docker compose restart'
+	rm -f private_key.pem
+
+# Tail the EC2 Airflow api-server logs.
+ec2-airflow-logs:
+	terraform -chdir=./terraform output -raw private_key > private_key.pem && chmod 600 private_key.pem
+	ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i private_key.pem ubuntu@$$(terraform -chdir=./terraform output -raw ec2_public_dns) \
+		'cd $(EC2_REPO_DIR) && sudo docker compose logs --tail=100 -f airflow-apiserver'
+	rm -f private_key.pem
+
+# Open a shell on the EC2 instance (alias of ssh-ec2, kept in this section).
+ec2-airflow-ssh:
+	terraform -chdir=./terraform output -raw private_key > private_key.pem && chmod 600 private_key.pem && ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i private_key.pem ubuntu@$$(terraform -chdir=./terraform output -raw ec2_public_dns) ; rm -f private_key.pem
+
+####################################################################################################################
 # Instacart ML pipeline (train + serve on ECS with Ray)
 
 ML_AWS_REGION ?= us-east-2
