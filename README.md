@@ -170,7 +170,7 @@ Set up:
    **Client ID**, **Client secret**, and **AuthKit domain**
    (for example `https://your-app.authkit.app`).
 2. Add the redirect URI to the AuthKit application:
-   `<AIRFLOW__WEBSERVER__BASE_URL>/auth/oauth-authorized/workos`.
+   `<AIRFLOW__API__BASE_URL>/auth/oauth-authorized/workos`.
    On the ALB that is `http://<alb-dns>/auth/oauth-authorized/workos`.
 3. Provide the values to the EC2 Airflow environment (repo `.env`, or CI/SSM):
 
@@ -179,7 +179,7 @@ Set up:
    WORKOS_CLIENT_SECRET=sk_...
    WORKOS_AUTHKIT_DOMAIN=https://your-app.authkit.app
    # Public URL of the UI, used to build the OAuth redirect URI
-   AIRFLOW__WEBSERVER__BASE_URL=http://<alb-dns>
+   AIRFLOW__API__BASE_URL=http://<alb-dns>
    # optional
    WORKOS_DEFAULT_ROLE=Viewer
    WORKOS_ADMIN_EMAILS=you@example.com     # comma-separated; granted Admin

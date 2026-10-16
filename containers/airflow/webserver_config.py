@@ -20,7 +20,7 @@ Optional:
 
 Redirect URI to register on the WorkOS AuthKit application:
 
-    <AIRFLOW__WEBSERVER__BASE_URL>/auth/oauth-authorized/<WORKOS_SSO_PROVIDER_NAME>
+    <AIRFLOW__API__BASE_URL>/auth/oauth-authorized/<WORKOS_SSO_PROVIDER_NAME>
 
 This file is mounted into the EC2 Airflow by docker-compose
 (see ``docker-compose.yml``); the ECS Airflow image is not affected.
@@ -45,6 +45,9 @@ PROVIDER_NAME = os.getenv("WORKOS_SSO_PROVIDER_NAME", "workos").strip() or "work
 CLIENT_ID = os.getenv("WORKOS_CLIENT_ID", "").strip()
 CLIENT_SECRET = os.getenv("WORKOS_CLIENT_SECRET", "").strip()
 AUTHKIT_DOMAIN = os.getenv("WORKOS_AUTHKIT_DOMAIN", "").strip().rstrip("/")
+# Accept a bare AuthKit domain (e.g. my-app.authkit.app) and default to https.
+if AUTHKIT_DOMAIN and not AUTHKIT_DOMAIN.startswith(("http://", "https://")):
+    AUTHKIT_DOMAIN = f"https://{AUTHKIT_DOMAIN}"
 DEFAULT_ROLE = os.getenv("WORKOS_DEFAULT_ROLE", "Viewer").strip() or "Viewer"
 ADMIN_EMAILS = {
     email.strip().lower()
