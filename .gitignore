@@ -91,3 +91,6 @@ private_key.pem
 containers/airflow/dags/
 instacart_data/*
 instacart_data/
+
+# Local environment file with secrets — never commit it. Copy .env.example instead.
+.env
