@@ -17,6 +17,16 @@ x-airflow-common:
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET:-airflow_jwt_secret}
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
+    # Public URL of the Airflow UI; used to build the OAuth redirect URI.
+    AIRFLOW__WEBSERVER__BASE_URL: ${AIRFLOW__WEBSERVER__BASE_URL:-http://localhost:8080}
+    # --- WorkOS AuthKit SSO (see containers/airflow/webserver_config.py) -----
+    # Leave blank to keep the default local DB auth (airflow / airflow).
+    WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
+    WORKOS_CLIENT_SECRET: ${WORKOS_CLIENT_SECRET:-}
+    WORKOS_AUTHKIT_DOMAIN: ${WORKOS_AUTHKIT_DOMAIN:-}
+    WORKOS_SSO_PROVIDER_NAME: ${WORKOS_SSO_PROVIDER_NAME:-workos}
+    WORKOS_DEFAULT_ROLE: ${WORKOS_DEFAULT_ROLE:-Viewer}
+    WORKOS_ADMIN_EMAILS: ${WORKOS_ADMIN_EMAILS:-}
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
@@ -36,6 +46,8 @@ x-airflow-common:
     - ./tests:/opt/airflow/tests
     - ./temp:/opt/airflow/temp
     - ./migrations:/opt/airflow/migrations
+    # WorkOS AuthKit SSO config (EC2 Airflow only; not baked into the image).
+    - ./containers/airflow/webserver_config.py:/opt/airflow/webserver_config.py:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on

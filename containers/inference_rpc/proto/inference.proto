@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package inference;
+
+option go_package = "github.com/RealTimeMilo/data_engineering_project/containers/inference_rpc/gen";
+
+// Inference is the public RPC surface. The Go server forwards to Ray Serve,
+// which owns model execution and Feast online feature retrieval.
+service Inference {
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc Predict(PredictRequest) returns (PredictResponse);
+  rpc PredictOnline(OnlineRequest) returns (PredictResponse);
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1;      // "ok" when the upstream Ray Serve deployment answers
+  bool ray_ready = 2;
+  string detail = 3;
+}
+
+message FeatureValue {
+  string name = 1;
+  double value = 2;
+}
+
+// One row of raw model features.
+message FeatureInstance {
+  repeated FeatureValue features = 1;
+}
+
+message PredictRequest {
+  repeated FeatureInstance instances = 1;
+}
+
+message Entity {
+  int64 user_id = 1;
+  int64 product_id = 2;
+}
+
+message OnlineRequest {
+  repeated Entity entities = 1;
+}
+
+message PredictResponse {
+  repeated double probabilities = 1;
+  string model = 2;
+}

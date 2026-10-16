@@ -87,3 +87,7 @@ postgres.py
 global-bundle.pem
 private_key.pem
 /terraform
+# Staged DAG copy baked into the ECS Airflow image
+containers/airflow/dags/
+instacart_data/*
+instacart_data/

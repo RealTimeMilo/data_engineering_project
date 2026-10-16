@@ -2,6 +2,7 @@ from datetime import datetime
 from airflow.providers.amazon.aws.operators.rds import RdsCreateDbInstanceOperator
 from airflow import DAG
 from airflow.sdk import Param
+from botocore import regions
 
 with DAG(
     dag_id="trigger_rds_from_form",
