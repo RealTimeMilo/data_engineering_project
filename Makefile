@@ -2,6 +2,9 @@
 # Setup containers to run Airflow
 
 docker-spin-up:
+	@rm -rf containers/airflow/dags
+	@mkdir -p containers/airflow/dags
+	@cp -R dags/. containers/airflow/dags/
 	docker compose build && docker compose up airflow-init && docker compose up -d
 
 perms:
