@@ -70,10 +70,10 @@ USE_OIDC = os.getenv("WORKOS_USE_OIDC", "false").strip().lower() in (
     "1", "true", "yes", "on",
 )
 
-# Behind the ALB, TLS is terminated at the load balancer, so the container sees
-# plain HTTP. Trust the proxy headers (X-Forwarded-Proto/Host) so Flask builds
-# https:// URLs with the external host instead of http:// + the internal host.
-ENABLE_PROXY_FIX = True
+# Note: the proxy fix is enabled via the Airflow config in docker-compose.yml
+# (AIRFLOW__FAB__ENABLE_PROXY_FIX / PROXY_FIX_X_PROTO / PROXY_FIX_X_HOST), which
+# makes FAB apply werkzeug's ProxyFix so external URLs (the OAuth callback) are
+# built as https://<external host> instead of http://<internal host>.
 
 WORKOS_ENABLED = bool(CLIENT_ID and CLIENT_SECRET) and (
     AUTHKIT_DOMAIN if USE_OIDC else True
