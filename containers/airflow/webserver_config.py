@@ -70,6 +70,12 @@ USE_OIDC = os.getenv("WORKOS_USE_OIDC", "false").strip().lower() in (
     "1", "true", "yes", "on",
 )
 
+# Behind the ALB the app is reached over HTTPS but the container sees HTTP, so
+# Flask would build http:// callback URLs. Prefer https when the configured base
+# URL is https (e.g. https://data-platform-airflow.ohmilo.com).
+if os.getenv("AIRFLOW__API__BASE_URL", "").strip().startswith("https://"):
+    PREFERRED_URL_SCHEME = "https"
+
 WORKOS_ENABLED = bool(CLIENT_ID and CLIENT_SECRET) and (
     AUTHKIT_DOMAIN if USE_OIDC else True
 )
