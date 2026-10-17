@@ -142,7 +142,10 @@ if WORKOS_ENABLED:
             role_keys = ["Admin"] if email and email in ADMIN_EMAILS else [DEFAULT_ROLE]
 
             return {
-                "username": "workos_" + (data.get("id") or data.get("sub") or email or "user"),
+                # Email is stable; the WorkOS user id changes on re-signup, which
+                # would make FAB try to insert a new row and hit the email unique
+                # constraint. Key the username on email instead.
+                "username": "workos_" + (email or data.get("id") or data.get("sub") or "user"),
                 "email": email,
                 "first_name": data.get("first_name") or data.get("given_name") or "",
                 "last_name": data.get("last_name") or data.get("family_name") or "",
