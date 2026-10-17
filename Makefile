@@ -5,7 +5,9 @@ docker-spin-up:
 	@rm -rf containers/airflow/dags
 	@mkdir -p containers/airflow/dags
 	@cp -R dags/. containers/airflow/dags/
-	docker compose build && docker compose up airflow-init && docker compose up -d
+	# --force-recreate: a single-file bind mount (webserver_config.py) goes stale
+	# when the file is replaced (e.g. git checkout/reset), so re-bind on every up.
+	docker compose build && docker compose up airflow-init && docker compose up -d --force-recreate
 
 perms:
 	sudo mkdir -p logs plugins temp dags tests migrations data visualization && sudo chmod -R u=rwx,g=rwx,o=rwx logs plugins temp dags tests migrations data visualization
