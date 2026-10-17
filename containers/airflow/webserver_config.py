@@ -105,7 +105,12 @@ if WORKOS_ENABLED:
             "access_token_url": "https://api.workos.com/user_management/authenticate",
             "api_base_url": "https://api.workos.com/user_management/",
             "request_token_url": None,
-            "client_kwargs": {"scope": "openid profile email"},
+            # WorkOS's authenticate endpoint expects client_id/client_secret in
+            # the request body (not HTTP Basic), so use client_secret_post.
+            "client_kwargs": {
+                "scope": "openid profile email",
+                "token_endpoint_auth_method": "client_secret_post",
+            },
         }
 
     OAUTH_PROVIDERS = [
