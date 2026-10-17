@@ -31,6 +31,8 @@ This file is mounted into the EC2 Airflow by docker-compose
 (see ``docker-compose.yml``); the ECS Airflow image is not affected.
 """
 
+import base64
+import json
 import os
 
 from flask_appbuilder.const import AUTH_DB, AUTH_OAUTH
@@ -59,6 +61,47 @@ ADMIN_EMAILS = {
     for email in os.getenv("WORKOS_ADMIN_EMAILS", "").split(",")
     if email.strip()
 }
+
+# Map WorkOS role slugs (from the session token's role/roles claim) onto Airflow
+# (FAB) roles. Override with WORKOS_ROLE_MAPPING as a JSON dict, e.g.
+#   WORKOS_ROLE_MAPPING={"admin":["Admin"],"engineer":["Op"],"member":["Viewer"]}
+_DEFAULT_ROLE_MAPPING = {
+    "admin": ["Admin"],
+    "op": ["Op"],
+    "user": ["User"],
+    "viewer": ["Viewer"],
+    "member": ["Viewer"],
+}
+try:
+    ROLE_MAPPING = json.loads(os.getenv("WORKOS_ROLE_MAPPING") or "null") or _DEFAULT_ROLE_MAPPING
+except ValueError:
+    ROLE_MAPPING = _DEFAULT_ROLE_MAPPING
+
+
+def _jwt_claims(token: str) -> dict:
+    """Decode a JWT payload without signature verification.
+
+    The token is received directly from WorkOS over TLS, so we only read it to
+    map WorkOS roles onto Airflow roles.
+    """
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        return json.loads(base64.urlsafe_b64decode(payload.encode()))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _workos_roles(response) -> list:
+    """WorkOS role slugs from the token response (access-token role/roles claim)."""
+    if not isinstance(response, dict):
+        return []
+    token = response.get("access_token")
+    claims = _jwt_claims(token) if token else {}
+    roles = claims.get("roles")
+    if not roles and claims.get("role"):
+        roles = [claims["role"]]
+    return [str(role) for role in (roles or []) if role]
 
 # WorkOS exposes AuthKit two ways:
 #   * generic: https://api.workos.com/user_management/{authorize,authenticate}
@@ -90,7 +133,8 @@ if WORKOS_ENABLED:
     AUTH_USER_REGISTRATION = True
     AUTH_USER_REGISTRATION_ROLE = DEFAULT_ROLE
     AUTH_ROLES_SYNC_AT_LOGIN = True
-    AUTH_ROLES_MAPPING = {DEFAULT_ROLE: [DEFAULT_ROLE], "Admin": ["Admin"]}
+    # Keys are WorkOS role slugs returned in role_keys (see get_oauth_user_info).
+    AUTH_ROLES_MAPPING = ROLE_MAPPING
 
     if USE_OIDC and AUTHKIT_DOMAIN:
         remote_app = {
@@ -145,7 +189,15 @@ if WORKOS_ENABLED:
                 data = remote.get("userinfo").json()
 
             email = (data.get("email") or "").lower()
-            role_keys = ["Admin"] if email and email in ADMIN_EMAILS else [DEFAULT_ROLE]
+            # Airflow roles follow the user's WorkOS role(s); an email in
+            # WORKOS_ADMIN_EMAILS is always Admin. Unknown WorkOS roles fall back
+            # to WORKOS_DEFAULT_ROLE.
+            workos_roles = _workos_roles(response)
+            if email and email in ADMIN_EMAILS:
+                role_keys = ["Admin"]
+            else:
+                mapped = [role for role in workos_roles if role in ROLE_MAPPING]
+                role_keys = mapped or [DEFAULT_ROLE]
 
             return {
                 # Email is stable; the WorkOS user id changes on re-signup, which
