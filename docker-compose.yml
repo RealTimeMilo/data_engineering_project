@@ -26,6 +26,10 @@ x-airflow-common:
     AIRFLOW__FAB__PROXY_FIX_X_PROTO: '1'
     AIRFLOW__FAB__PROXY_FIX_X_HOST: '1'
     AIRFLOW__FAB__PROXY_FIX_X_PORT: '1'
+    # Session cookie: Secure (HTTPS-only) with a 30-day lifetime is set via the
+    # Airflow default (fab session_lifetime_minutes=43200).
+    AIRFLOW__FAB__COOKIE_SECURE: 'True'
+    AIRFLOW__FAB__COOKIE_SAMESITE: 'Lax'
     # --- WorkOS AuthKit SSO (see containers/airflow/webserver_config.py) -----
     # Leave blank to keep the default local DB auth (airflow / airflow).
     WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
@@ -40,7 +44,6 @@ x-airflow-common:
     # yamllint enable rule:line-length
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     # WARNING: Use _PIP_ADDITIONAL_REQUIREMENTS option ONLY for a quick checks
-    # for other purpose (development, test and especially production usage) build/extend Airflow image.
     # for other purpose (development, test and especially production usage) build/extend Airflow image.
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
 
