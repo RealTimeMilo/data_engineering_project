@@ -70,11 +70,10 @@ USE_OIDC = os.getenv("WORKOS_USE_OIDC", "false").strip().lower() in (
     "1", "true", "yes", "on",
 )
 
-# Behind the ALB the app is reached over HTTPS but the container sees HTTP, so
-# Flask would build http:// callback URLs. Prefer https when the configured base
-# URL is https (e.g. https://data-platform-airflow.ohmilo.com).
-if os.getenv("AIRFLOW__API__BASE_URL", "").strip().startswith("https://"):
-    PREFERRED_URL_SCHEME = "https"
+# Behind the ALB, TLS is terminated at the load balancer, so the container sees
+# plain HTTP. Trust the proxy headers (X-Forwarded-Proto/Host) so Flask builds
+# https:// URLs with the external host instead of http:// + the internal host.
+ENABLE_PROXY_FIX = True
 
 WORKOS_ENABLED = bool(CLIENT_ID and CLIENT_SECRET) and (
     AUTHKIT_DOMAIN if USE_OIDC else True
