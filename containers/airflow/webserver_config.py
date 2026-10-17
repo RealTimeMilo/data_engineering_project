@@ -75,6 +75,12 @@ USE_OIDC = os.getenv("WORKOS_USE_OIDC", "false").strip().lower() in (
 # makes FAB apply werkzeug's ProxyFix so external URLs (the OAuth callback) are
 # built as https://<external host> instead of http://<internal host>.
 
+# Security: do not keep users signed in across browser sessions. FAB reads
+# SESSION_PERMANENT from the Flask config; False makes the session cookie a
+# browser-session cookie (cleared when the browser closes), so users sign in
+# again each session instead of getting a 30-day persistent cookie.
+SESSION_PERMANENT = False
+
 WORKOS_ENABLED = bool(CLIENT_ID and CLIENT_SECRET) and (
     AUTHKIT_DOMAIN if USE_OIDC else True
 )
