@@ -90,7 +90,6 @@ def ml_task(task_id: str, step: str, command: str, extra_env: list[dict]) -> Ecs
     return EcsRunTaskOperator(
         task_id=task_id,
         aws_conn_id=AWS_CONN_ID,
-        region=AWS_REGION,
         cluster=CLUSTER,
         task_definition=TASK_DEFS[step],
         launch_type="FARGATE",
