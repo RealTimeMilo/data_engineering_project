@@ -193,8 +193,21 @@ def ensure_pipeline_run() -> str:
 class Recorder:
     """Thin, failure-tolerant wrapper around an active MLflow run."""
 
-    def __init__(self, mlflow=None) -> None:
+    def __init__(
+        self,
+        mlflow=None,
+        parent_id: str = "",
+        stage_name: str = "",
+    ) -> None:
         self._mlflow = mlflow
+        self._parent_id = parent_id
+        self._stage = stage_name
+        self._client = None
+
+    def _parent_client(self):
+        if self._client is None:
+            self._client = self._mlflow.tracking.MlflowClient()
+        return self._client
 
     @property
     def active(self) -> bool:
@@ -218,6 +231,21 @@ class Recorder:
                 self._mlflow.log_metrics(dict(items[start : start + 100]))
         except Exception as exc:  # noqa: BLE001
             _warn(exc)
+
+        # Mirror stage metrics onto the parent run (prefixed with the stage
+        # name) so the experiment's top-level table has metric columns instead
+        # of only nested child runs.
+        if self._parent_id:
+            try:
+                client = self._parent_client()
+                for key, value in flat.items():
+                    client.log_metric(
+                        self._parent_id,
+                        _metric_key(f"{self._stage}.{key}"),
+                        value,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                _warn(exc)
 
     def set_tags(self, tags: dict[str, Any]) -> None:
         if not self._mlflow or not tags:
@@ -298,7 +326,7 @@ def stage(
         yield _NULL
         return
 
-    recorder = Recorder(mlflow)
+    recorder = Recorder(mlflow, parent_id=parent_id, stage_name=name)
     try:
         if params:
             recorder.log_params(params)
