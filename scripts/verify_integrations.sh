@@ -66,6 +66,13 @@ if [ "$mode" = "bootstrap" ] || [ "$mode" = "all" ]; then
   wait_and_report "$ARN" "analytics-bootstrap" || rc=$?
 fi
 
+if [ "$mode" = "dimensions" ] || [ "$mode" = "all" ]; then
+  FAMILY="$($TF output -json ml_task_definition_families | python3 -c 'import sys,json;print(json.load(sys.stdin)["evaluate"])')"
+  OVERRIDES='{"containerOverrides":[{"name":"ml-task","command":["python","load_dimensions.py"],"environment":[{"name":"ML_RUN_ID","value":"dimensions"}]}]}'
+  ARN=$(run_task "$FAMILY" "$OVERRIDES")
+  wait_and_report "$ARN" "dimensions" || rc=$?
+fi
+
 if [ "$mode" = "check" ] || [ "$mode" = "all" ]; then
   FAMILY=$($TF output -json ml_task_definition_families | python3 -c 'import sys,json;print(json.load(sys.stdin)["evaluate"])')
   OVERRIDES='{"containerOverrides":[{"name":"ml-task","command":["python","check_connections.py"],"environment":[{"name":"ML_RUN_ID","value":"connectivity-check"}]}]}'

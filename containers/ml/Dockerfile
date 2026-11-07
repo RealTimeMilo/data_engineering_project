@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # MLflow inspects the git repo for source tags; there is no git in the image.
 ENV GIT_PYTHON_REFRESH=quiet
 
-COPY config.py utils.py mlflow_utils.py analytics.py bootstrap_analytics.py check_connections.py ingest.py preprocess.py train.py evaluate.py deploy.py ./
+COPY config.py utils.py mlflow_utils.py analytics.py bootstrap_analytics.py check_connections.py load_dimensions.py ingest.py preprocess.py train.py evaluate.py deploy.py ./
 
 # Each ECS task overrides the command (e.g. ["python", "preprocess.py"]).
 CMD ["python", "-c", "print('Override the command with python <script>.py')"]

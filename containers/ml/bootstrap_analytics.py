@@ -80,6 +80,28 @@ DDL = [
     f"ON {SCHEMA}.model_predictions (user_id)",
     f"CREATE INDEX IF NOT EXISTS model_predictions_product_idx "
     f"ON {SCHEMA}.model_predictions (product_id)",
+    # Dimension tables (loaded by load_dimensions.py) so dashboards can group
+    # predictions by product / aisle / department names instead of ids.
+    f"""
+    CREATE TABLE IF NOT EXISTS {SCHEMA}.dim_products (
+        product_id    bigint PRIMARY KEY,
+        product_name  text NOT NULL,
+        aisle_id      bigint,
+        department_id bigint
+    )
+    """,
+    f"""
+    CREATE TABLE IF NOT EXISTS {SCHEMA}.dim_aisles (
+        aisle_id bigint PRIMARY KEY,
+        aisle    text NOT NULL
+    )
+    """,
+    f"""
+    CREATE TABLE IF NOT EXISTS {SCHEMA}.dim_departments (
+        department_id bigint PRIMARY KEY,
+        department    text NOT NULL
+    )
+    """,
 ]
 
 

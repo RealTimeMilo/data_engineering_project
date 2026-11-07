@@ -196,6 +196,10 @@ mode-connection:
 verify-integrations:
 	bash scripts/verify_integrations.sh all
 
+# Load the product/aisle/department dimensions into the analytics DB.
+analytics-dimensions:
+	bash scripts/verify_integrations.sh dimensions
+
 # Ray Serve inference + Go gRPC gateway (terraform/rpc_serving.tf)
 rpc-build:
 	docker build --platform linux/amd64 -f containers/ray_serve/Dockerfile -t $$(terraform -chdir=./terraform output -raw ray_serve_ecr_repository_url):$(ML_IMAGE_TAG) .

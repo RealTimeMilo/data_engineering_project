@@ -53,11 +53,18 @@ ml_analytics.model_metrics
 ml_analytics.model_predictions
     run_id, user_id, product_id, label, reorder_probability, scored_at
                                                        UNIQUE(run_id, user_id, product_id)
+ml_analytics.dim_products
+    product_id, product_name, aisle_id, department_id
+ml_analytics.dim_aisles
+    aisle_id, aisle
+ml_analytics.dim_departments
+    department_id, department
 ```
 
 `evaluate.py` publishes every scored test pair (≈8.8k rows per run), and
 `train.py` / `evaluate.py` / `deploy.py` upsert metrics, so re-running a stage is
-idempotent.
+idempotent. The dimension tables are loaded from the raw Instacart CSVs with
+`make analytics-dimensions` (idempotent upsert, ~50k products).
 
 ## Bootstrap (once per stack)
 
@@ -87,38 +94,197 @@ In Mode: **New → Data source → PostgreSQL**
 Mode validates the connection from its own egress IPs, so it must be created
 from Mode's UI (not from a local `psql`, which is not allowlisted).
 
-## Example queries
+## Query cookbook
+
+Every query scopes to the latest successful run:
 
 ```sql
--- Latest model metrics, one row per metric
-SELECT run_id, stage, metric, value, recorded_at
-FROM ml_analytics.model_metrics
-WHERE run_id = (SELECT run_id FROM ml_analytics.pipeline_runs
-                ORDER BY started_at DESC LIMIT 1)
-ORDER BY stage, metric;
+WHERE run_id = (
+  SELECT run_id FROM ml_analytics.pipeline_runs
+  WHERE status = 'succeeded'
+  ORDER BY started_at DESC LIMIT 1
+)
+```
 
--- Score distribution for the most recent run
+### 1. What the decile query means (calibration)
+
+```sql
 SELECT width_bucket(reorder_probability, 0, 1, 10) AS decile,
-       count(*) AS pairs,
-       avg(label) AS observed_reorder_rate,
+       count(*)                 AS pairs,
+       avg(label)               AS observed_reorder_rate,
        avg(reorder_probability) AS mean_score
 FROM ml_analytics.model_predictions
 WHERE run_id = (SELECT run_id FROM ml_analytics.pipeline_runs
+                WHERE status = 'succeeded'
                 ORDER BY started_at DESC LIMIT 1)
-GROUP BY 1 ORDER BY 1;
+GROUP BY 1
+ORDER BY 1;
+```
 
--- Top products by predicted reorder volume
-SELECT product_id,
-       count(*) AS pairs,
-       avg(reorder_probability) AS mean_score,
-       sum(reorder_probability) AS expected_reorders
+- `model_predictions` has one row per held-out `(user, product)` candidate, with
+  the true `label` (1 = the product was reordered) and the model's score.
+- `width_bucket(x, 0, 1, 10)` is PostgreSQL's histogram helper: it maps the
+  probability into one of 10 equal-width buckets (`0–0.1` → 1, …, `0.9–1.0` → 10).
+- `count(*)` is how many candidates the model put in that bucket (the score
+  distribution).
+- `avg(label)` is the **actual** reorder rate in the bucket; `avg(reorder_probability)`
+  is the **predicted** average. A calibrated model has these two close together.
+- `GROUP BY 1` groups by the first select expression (the bucket).
+
+This measures **calibration**, not ranking. AUC/PR-AUC (in `model_metrics`) measure
+whether positives rank above negatives; calibration measures whether a score of
+0.2 really means a 20% chance.
+
+Observed on the latest run:
+
+| decile | pairs | observed | mean score |
+|---|---|---|---|
+| 1 | 3,214 | 0.0526 | 0.0634 |
+| 2 | 2,468 | 0.1438 | 0.1430 |
+| 3 | 1,534 | 0.2458 | 0.2478 |
+| 4 | 942 | 0.3355 | 0.3442 |
+| 5 | 453 | 0.3863 | 0.4429 |
+| 6 | 193 | 0.5130 | 0.5442 |
+| 7 | 48 | 0.6250 | 0.6359 |
+
+The model is well calibrated through decile 4 and modestly over-predicts in the
+5–7 range; decile 8 has only 3 rows.
+
+### 2. Confusion matrix at 0.5 (and why accuracy is misleading)
+
+```sql
+SELECT
+  sum(CASE WHEN reorder_probability >= 0.5 AND label = 1 THEN 1 ELSE 0 END) AS true_positives,
+  sum(CASE WHEN reorder_probability >= 0.5 AND label = 0 THEN 1 ELSE 0 END) AS false_positives,
+  sum(CASE WHEN reorder_probability <  0.5 AND label = 1 THEN 1 ELSE 0 END) AS false_negatives,
+  sum(CASE WHEN reorder_probability <  0.5 AND label = 0 THEN 1 ELSE 0 END) AS true_negatives,
+  round(avg(CASE WHEN (reorder_probability >= 0.5) = (label = 1) THEN 1 ELSE 0 END)::numeric, 4) AS accuracy
 FROM ml_analytics.model_predictions
 WHERE run_id = (SELECT run_id FROM ml_analytics.pipeline_runs
-                ORDER BY started_at DESC LIMIT 1)
-GROUP BY product_id
-ORDER BY expected_reorders DESC
-LIMIT 25;
+                WHERE status = 'succeeded'
+                ORDER BY started_at DESC LIMIT 1);
 ```
+
+Result: `TP=130, FP=114, FN=1,392, TN=7,219`, accuracy `0.8299`. Only ~17% of
+candidates are reordered, so a 0.5 cut-off has high precision but low recall —
+use a lower threshold if recall matters more.
+
+### 3. Top departments by expected reorders
+
+```sql
+SELECT d.department,
+       count(*)                          AS pairs,
+       round(avg(p.reorder_probability)::numeric, 3) AS mean_score,
+       round(sum(p.reorder_probability)::numeric, 0) AS expected_reorders,
+       round(avg(p.label)::numeric, 3)    AS observed_rate
+FROM ml_analytics.model_predictions p
+JOIN ml_analytics.dim_products    dp USING (product_id)
+JOIN ml_analytics.dim_departments d  USING (department_id)
+WHERE p.run_id = (SELECT run_id FROM ml_analytics.pipeline_runs
+                  WHERE status = 'succeeded'
+                  ORDER BY started_at DESC LIMIT 1)
+GROUP BY 1
+ORDER BY expected_reorders DESC
+LIMIT 10;
+```
+
+`sum(probability)` is the expected number of reorders if each candidate were
+scored independently — a useful prioritisation metric.
+
+| department | pairs | mean score | expected reorders | observed |
+|---|---|---|---|---|
+| produce | 2,546 | 0.222 | 565 | 0.207 |
+| dairy eggs | 1,357 | 0.216 | 293 | 0.210 |
+| beverages | 651 | 0.216 | 141 | 0.229 |
+| snacks | 821 | 0.151 | 124 | 0.128 |
+| frozen | 637 | 0.155 | 99 | 0.138 |
+
+### 4. Top products by expected reorders
+
+```sql
+SELECT dp.product_name,
+       d.department,
+       count(*)                          AS pairs,
+       round(avg(p.reorder_probability)::numeric, 3) AS mean_score,
+       round(sum(p.reorder_probability)::numeric, 1) AS expected_reorders
+FROM ml_analytics.model_predictions p
+JOIN ml_analytics.dim_products    dp USING (product_id)
+JOIN ml_analytics.dim_departments d  USING (department_id)
+WHERE p.run_id = (SELECT run_id FROM ml_analytics.pipeline_runs
+                  WHERE status = 'succeeded'
+                  ORDER BY started_at DESC LIMIT 1)
+GROUP BY 1, 2
+ORDER BY expected_reorders DESC
+LIMIT 15;
+```
+
+Top rows: Banana (51.9 expected), Bag of Organic Bananas (34.6), Organic
+Strawberries (21.4), Organic Baby Spinach (17.2).
+
+### 5. Over-predicted products (systematic error)
+
+```sql
+SELECT dp.product_name,
+       count(*)                                       AS pairs,
+       round(avg(p.reorder_probability)::numeric, 3)   AS mean_score,
+       round(avg(p.label)::numeric, 3)                 AS observed_rate,
+       round((avg(p.reorder_probability) - avg(p.label))::numeric, 3) AS gap
+FROM ml_analytics.model_predictions p
+JOIN ml_analytics.dim_products dp USING (product_id)
+WHERE p.run_id = (SELECT run_id FROM ml_analytics.pipeline_runs
+                  WHERE status = 'succeeded'
+                  ORDER BY started_at DESC LIMIT 1)
+GROUP BY 1
+HAVING count(*) >= 20          -- ignore tiny samples
+ORDER BY gap DESC
+LIMIT 10;
+```
+
+Largest gaps in the latest run: Limes (+0.162), Organic Yellow Onion (+0.153),
+Apple Honeycrisp Organic (+0.130). Sorting ascending gives under-predicted
+products instead.
+
+### 6. Users with the highest expected reorders
+
+```sql
+SELECT user_id,
+       count(*)                          AS candidate_products,
+       round(sum(reorder_probability)::numeric, 1) AS expected_reorders,
+       round(avg(reorder_probability)::numeric, 3) AS mean_score
+FROM ml_analytics.model_predictions
+WHERE run_id = (SELECT run_id FROM ml_analytics.pipeline_runs
+                WHERE status = 'succeeded'
+                ORDER BY started_at DESC LIMIT 1)
+GROUP BY 1
+ORDER BY expected_reorders DESC
+LIMIT 10;
+```
+
+### 7. Compare runs (model metrics pivot)
+
+```sql
+SELECT run_id,
+       max(value) FILTER (WHERE stage = 'evaluate' AND metric = 'roc_auc')      AS roc_auc,
+       max(value) FILTER (WHERE stage = 'evaluate' AND metric = 'pr_auc')       AS pr_auc,
+       max(value) FILTER (WHERE stage = 'evaluate' AND metric = 'accuracy')     AS accuracy,
+       max(value) FILTER (WHERE stage = 'train'    AND metric = 'best_iteration') AS best_iteration,
+       max(value) FILTER (WHERE stage = 'preprocess' AND metric = 'candidate_rows') AS candidates
+FROM ml_analytics.model_metrics
+GROUP BY run_id
+ORDER BY run_id;
+```
+
+### 8. Pipeline health
+
+```sql
+SELECT run_id, status,
+       to_char(started_at, 'YYYY-MM-DD HH24:MI') AS started,
+       round(extract(epoch FROM (finished_at - started_at)) / 60.0, 1) AS minutes
+FROM ml_analytics.pipeline_runs
+ORDER BY started_at DESC;
+```
+
+The latest production run took **7.8 minutes** end to end.
 
 ## Security notes
 
