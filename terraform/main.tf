@@ -103,7 +103,7 @@ provider "aws" {
 #   statistic           = "Average"
 #   threshold           = 70
 #   alarm_actions       = [aws_autoscaling_policy.scale_up.arn]
-  
+
 #   dimensions = {
 #     AutoScalingGroupName = aws_autoscaling_group.autoscale.name
 #   }
@@ -119,7 +119,7 @@ provider "aws" {
 #   statistic           = "Average"
 #   threshold           = 30
 #   alarm_actions       = [aws_autoscaling_policy.scale_down.arn]
-  
+
 #   dimensions = {
 #     AutoScalingGroupName = aws_autoscaling_group.autoscale.name
 #   }
@@ -155,11 +155,11 @@ resource "aws_security_group" "sde_security_group" {
     # security_groups = [aws_security_group.alb.id]
   }
 
-    ingress {
-    description = "Inbound HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
+  ingress {
+    description     = "Inbound HTTPS"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
 
@@ -206,7 +206,7 @@ data "aws_ami" "ubuntu" {
 
 # resource "aws_iam_role" "ecs_task_execution_role" {
 #   name = "airflow-ecs-task-execution-role"
-  
+
 #     Version = "2012-10-17"
 #     Statement = [
 #       {
@@ -227,7 +227,7 @@ data "aws_ami" "ubuntu" {
 
 # resource "aws_iam_role" "ecs_task_role" {
 #   name = "airflow-ecs-task-role"
-  
+
 #   assume_role_policy = jsonencode({
 #     Version = "2012-10-17"
 #     Statement = [
@@ -250,21 +250,21 @@ data "aws_ami" "ubuntu" {
 #   memory                   = "1024"  # 1 GB
 #   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
 #   task_role_arn            = aws_iam_role.ecs_task_role.arn
-  
+
 #   container_definitions = jsonencode([
 #     {
 #       name  = "airflow-webserver"
 #       image = "apache/airflow:2.7.1"
-      
+
 #       portMappings = [
 #         {
 #           containerPort = 8080
 #           protocol      = "tcp"
 #         }
 #       ]
-      
+
 #       command = ["webserver"]
-      
+
 #       logConfiguration = {
 #         logDriver = "awslogs"
 #         options = {
@@ -286,17 +286,17 @@ data "aws_ami" "ubuntu" {
 #   memory                   = "1024"
 #   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
 #   task_role_arn            = aws_iam_role.ecs_task_role.arn
-  
+
 #   container_definitions = jsonencode([
 #     {
 #       name    = "airflow-scheduler"
 #       image   = "apache/airflow:2.7.1"
 #       command = ["scheduler"]
-      
+
 #       environment = [
 #         # Same as webserver
 #       ]
-      
+
 #       logConfiguration = {
 #         logDriver = "awslogs"
 #         options = {
@@ -315,19 +315,19 @@ data "aws_ami" "ubuntu" {
 #   task_definition = aws_ecs_task_definition.airflow_webserver.arn
 #   desired_count   = 1
 #   launch_type     = "FARGATE"
-  
+
 #   network_configuration {
 #     subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
 #     security_groups  = [aws_security_group.airflow_sg.id]
 #     assign_public_ip = true
 #   }
-  
+
 #   load_balancer {
 #     target_group_arn = aws_lb_target_group.airflow_tg.arn
 #     container_name   = "airflow-webserver"
 #     container_port   = 8080
 #   }
-  
+
 #   depends_on = [aws_lb_listener.airflow_listener]
 # }
 
@@ -337,7 +337,7 @@ data "aws_ami" "ubuntu" {
 #   task_definition = aws_ecs_task_definition.airflow_scheduler.arn
 #   desired_count   = 1
 #   launch_type     = "FARGATE"
-  
+
 #   network_configuration {
 #     subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
 #     security_groups  = [aws_security_group.airflow_sg.id]
@@ -351,9 +351,11 @@ resource "aws_instance" "sde_ec2" {
 
   key_name        = aws_key_pair.generated_key.key_name
   security_groups = [aws_security_group.sde_security_group.name]
+  # Lets the docker-compose Airflow call ECS with the ambient instance role.
+  iam_instance_profile = aws_iam_instance_profile.ec2_ecs_runner.name
 
   root_block_device {
-    volume_size           = 30  # GB
+    volume_size           = 30 # GB
     volume_type           = "gp3"
     encrypted             = true
     delete_on_termination = true
@@ -366,7 +368,7 @@ resource "aws_instance" "sde_ec2" {
   ]
 
   tags = {
-    Name = "airflow_ec2"
+    Name        = "airflow_ec2"
     Environment = var.environment
   }
 

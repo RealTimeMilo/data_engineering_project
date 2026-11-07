@@ -57,6 +57,7 @@ LOG_MODEL = os.getenv("MLFLOW_LOG_MODEL", "false").strip().lower() in {
 }
 
 _PARENT_RUN_ID = (os.getenv("MLFLOW_PARENT_RUN_ID") or "").strip() or None
+_EXPERIMENT_ID = ""
 _CONFIGURED = False
 
 # MLflow rejects a handful of characters in metric/param keys.
@@ -105,7 +106,9 @@ def _configure():
         # Basic auth servers: MLflow reads these from the environment directly.
         pass
 
-    mlflow.set_experiment(EXPERIMENT_NAME)
+    global _EXPERIMENT_ID
+    experiment = mlflow.set_experiment(EXPERIMENT_NAME)
+    _EXPERIMENT_ID = str(getattr(experiment, "experiment_id", "") or "")
     _CONFIGURED = True
     logger.info("MLflow tracking URI=%s experiment=%s", uri, EXPERIMENT_NAME)
     return mlflow
@@ -327,4 +330,5 @@ def run_url() -> str:
     base = TRACKING_URI.rstrip("/")
     if base == "databricks":
         return ""
-    return f"{base}/#/experiments/{EXPERIMENT_NAME}/runs/{_PARENT_RUN_ID}"
+    experiment = _EXPERIMENT_ID or EXPERIMENT_NAME.strip("/")
+    return f"{base}/#/experiments/{experiment}/runs/{_PARENT_RUN_ID}"
