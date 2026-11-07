@@ -432,6 +432,43 @@ service Inference {
 Note: the NLB is TCP pass-through (no TLS). Add a TLS listener / cert if the
 endpoint must be encrypted in transit.
 
+### MLflow tracking (Databricks)
+
+The ML ECS tasks log to a Databricks-hosted MLflow server:
+
+- Experiment: `/Shared/instacart-reorder`
+- Tracking URI: `terraform output -raw mlflow_tracking_uri`
+- Token: SSM SecureString `/sde-airflow/dev/mlflow/tracking-token`
+
+Logging is best-effort (a tracking-server outage never fails a training run
+unless `MLFLOW_REQUIRED=true`). A parent run is created per Airflow run, with
+nested child runs for ingest / preprocess / train / evaluate / deploy.
+
+```shell
+# one-time (or after rotating the Databricks PAT)
+aws ssm put-parameter --region us-east-2 \
+  --name /sde-airflow/dev/mlflow/tracking-token \
+  --type SecureString --value "$DATABRICKS_TOKEN" --overwrite
+```
+
+See [docs/mlflow-databricks.md](docs/mlflow-databricks.md) for what is logged and
+how to verify it.
+
+### Analytics Postgres for Mode
+
+A dedicated, IP-allowlisted Postgres (`ml_analytics` schema) holds pipeline runs,
+model metrics, and scored predictions for Mode dashboards.
+
+```shell
+make analytics-bootstrap   # once: create schema, tables, and roles
+make mode-connection       # print host/port/database/user/password/url
+```
+
+The instance is public only to Mode's eight Direct Connect IPs; `mode_readonly`
+cannot write and enforces read-only transactions. See
+[docs/mode-analytics.md](docs/mode-analytics.md) for the Mode setup and example
+queries.
+
 ### Tear down infra
 
 After you are done, make sure to destroy your cloud infrastructure.

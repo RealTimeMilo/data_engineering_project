@@ -16,13 +16,16 @@ Sampling is at the *user* level so feature/label pairs stay consistent.
 import numpy as np
 import pandas as pd
 
+import analytics
 from config import (
     PARQUET_PREFIX,
     RANDOM_SEED,
     RAW_PREFIX,
+    RUN_ID,
     SAMPLE_FRACTION,
     s3_uri,
 )
+from mlflow_utils import stage as mlflow_stage
 from utils import configure_logging, read_csv, write_parquet
 
 logger = configure_logging("ingest")
@@ -110,6 +113,25 @@ def main() -> None:
     write_parquet(departments, f"{out}/departments.parquet")
 
     logger.info("Ingest complete.")
+
+    metrics = {
+        "sampled_users": int(len(sample_users)),
+        "prior_orders": int(len(prior_order_ids)),
+        "train_orders": int(len(train_order_ids)),
+        "prior_interactions": int(len(prior)),
+        "train_interactions": int(len(train)),
+    }
+    with mlflow_stage(
+        "ingest",
+        params={
+            "sample_fraction": SAMPLE_FRACTION,
+            "random_seed": RANDOM_SEED,
+            "raw_prefix": RAW_PREFIX,
+        },
+    ) as ml:
+        ml.log_metrics(metrics)
+    analytics.record_metrics(RUN_ID, "ingest", metrics)
+    logger.info("Recorded ingest metrics: %s", metrics)
 
 
 if __name__ == "__main__":

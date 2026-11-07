@@ -52,6 +52,19 @@ RAY_OBJECT_STORE_BYTES = int(
 ECS_CLUSTER = os.getenv("ML_ECS_CLUSTER", "")
 ECS_SERVICE = os.getenv("ML_ECS_SERVICE", "")
 
+# --- MLflow (Databricks-hosted tracking server) ---------------------------
+# Logging is a no-op when MLFLOW_TRACKING_URI is empty; see mlflow_utils.py.
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "")
+MLFLOW_EXPERIMENT_NAME = os.getenv(
+    "MLFLOW_EXPERIMENT_NAME", "/Shared/instacart-reorder"
+)
+
+# --- Analytics Postgres (Mode Analytics) ----------------------------------
+ANALYTICS_DB_HOST = os.getenv("ANALYTICS_DB_HOST", "")
+ANALYTICS_DB_PORT = int(os.getenv("ANALYTICS_DB_PORT", "5432"))
+ANALYTICS_DB_NAME = os.getenv("ANALYTICS_DB_NAME", "analytics")
+ANALYTICS_DB_USER = os.getenv("ANALYTICS_DB_USER", "ml_writer")
+
 # Every numeric column the model consumes. Keep in sync with preprocess.py.
 FEATURE_COLUMNS = [
     "times_bought",

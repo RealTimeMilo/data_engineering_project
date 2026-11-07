@@ -6,7 +6,8 @@ LightGBM booster is trained on the driver. For the sampled dataset produced by
 preprocess.py this is faster and far more robust on a single Fargate task than
 distributed LightGBM (which hangs on Ray's equal row split here).
 
-Writes the booster + metrics to s3://<bucket>/<models_prefix>/<run_id>/.
+Writes the booster + metrics to s3://<bucket>/<models_prefix>/<run_id>/ and, when
+MLflow is configured, logs params/metrics/model to the Databricks experiment.
 """
 
 import os
@@ -15,6 +16,7 @@ import tempfile
 import lightgbm as lgb
 import ray
 
+import analytics
 from config import (
     FEATURE_COLUMNS,
     LABEL_COLUMN,
@@ -26,6 +28,7 @@ from config import (
     S3_BUCKET,
     s3_uri,
 )
+from mlflow_utils import stage as mlflow_stage
 from utils import configure_logging, upload_file, write_json
 
 logger = configure_logging("train")
@@ -70,49 +73,87 @@ def main() -> None:
         reference=dtrain,
     )
 
-    logger.info("Training LightGBM for up to %s rounds...", NUM_ITERATIONS)
-    booster = lgb.train(
-        params,
-        dtrain,
-        num_boost_round=NUM_ITERATIONS,
-        valid_sets=[dvalid],
-        valid_names=["valid"],
-        callbacks=[lgb.log_evaluation(50), lgb.early_stopping(50)],
-    )
-    best = {
-        metric: float(value)
-        for metric, value in (booster.best_score.get("valid", {}) or {}).items()
-    }
-    logger.info("Best iteration=%s metrics=%s", booster.best_iteration, best)
-
     run_dir = f"{MODELS_PREFIX}/{RUN_ID}"
-    with tempfile.TemporaryDirectory() as tmp:
-        model_path = os.path.join(tmp, "model.txt")
-        booster.save_model(model_path)
-        upload_file(model_path, S3_BUCKET, f"{run_dir}/model.txt")
+
+    with mlflow_stage(
+        "train",
+        params={
+            **params,
+            "metric": ",".join(params["metric"]),
+            "num_boost_round": NUM_ITERATIONS,
+            "feature_columns": ",".join(FEATURE_COLUMNS),
+            "train_rows": int(len(train_pd)),
+            "valid_rows": int(len(valid_pd)),
+        },
+    ) as ml:
+        logger.info("Training LightGBM for up to %s rounds...", NUM_ITERATIONS)
+        booster = lgb.train(
+            params,
+            dtrain,
+            num_boost_round=NUM_ITERATIONS,
+            valid_sets=[dvalid],
+            valid_names=["valid"],
+            callbacks=[lgb.log_evaluation(50), lgb.early_stopping(50)],
+        )
+        best = {
+            metric: float(value)
+            for metric, value in (booster.best_score.get("valid", {}) or {}).items()
+        }
+        logger.info("Best iteration=%s metrics=%s", booster.best_iteration, best)
 
         importance = booster.feature_importance(importance_type="gain")
-        write_json(
-            S3_BUCKET,
-            f"{run_dir}/metrics.json",
+        importance_map = dict(
+            sorted(
+                zip(FEATURE_COLUMNS, importance.tolist()),
+                key=lambda kv: kv[1],
+                reverse=True,
+            )
+        )
+
+        payload = {
+            "run_id": RUN_ID,
+            "stage": "train",
+            "num_iterations": NUM_ITERATIONS,
+            "best_iteration": booster.best_iteration,
+            "learning_rate": LEARNING_RATE,
+            "train_rows": int(len(train_pd)),
+            "valid_rows": int(len(valid_pd)),
+            "best_metrics": best,
+            "feature_importance": importance_map,
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model_path = os.path.join(tmp, "model.txt")
+            booster.save_model(model_path)
+            upload_file(model_path, S3_BUCKET, f"{run_dir}/model.txt")
+            write_json(S3_BUCKET, f"{run_dir}/metrics.json", payload)
+
+            ml.log_model(booster, model_path)
+            ml.log_dict(payload, "metrics.json")
+            ml.log_artifact(model_path, artifact_path="booster")
+
+        ml.log_metrics(
             {
-                "run_id": RUN_ID,
-                "stage": "train",
-                "num_iterations": NUM_ITERATIONS,
                 "best_iteration": booster.best_iteration,
-                "learning_rate": LEARNING_RATE,
                 "train_rows": int(len(train_pd)),
                 "valid_rows": int(len(valid_pd)),
-                "best_metrics": best,
-                "feature_importance": dict(
-                    sorted(
-                        zip(FEATURE_COLUMNS, importance.tolist()),
-                        key=lambda kv: kv[1],
-                        reverse=True,
-                    )
-                ),
-            },
+            }
         )
+        ml.log_metrics(best, prefix="valid.")
+        ml.log_metrics(importance_map, prefix="importance.")
+
+    analytics.record_metrics(
+        RUN_ID,
+        "train",
+        {
+            "best_iteration": booster.best_iteration,
+            "train_rows": int(len(train_pd)),
+            "valid_rows": int(len(valid_pd)),
+            **{f"valid_{key}": value for key, value in best.items()},
+            "learning_rate": LEARNING_RATE,
+            "num_boost_round": NUM_ITERATIONS,
+        },
+    )
 
     ray.shutdown()
     logger.info("Training complete. Artifacts: s3://%s/%s", S3_BUCKET, run_dir)

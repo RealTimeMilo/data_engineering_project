@@ -167,6 +167,35 @@ ml-push: ml-build
 	docker push $$(terraform -chdir=./terraform output -raw ml_inference_ecr_repository_url):$(ML_IMAGE_TAG)
 	docker push $$(terraform -chdir=./terraform output -raw feast_image_repository_url):$(ML_IMAGE_TAG)
 
+# One-off task: create the ml_analytics schema + writer/read-only roles.
+# Safe to re-run (idempotent); also resets role passwords from SSM.
+analytics-bootstrap:
+	@CLUSTER=$$(terraform -chdir=./terraform output -raw ml_ecs_cluster_name); \
+	FAMILY=$$(terraform -chdir=./terraform output -raw analytics_bootstrap_task_definition_family); \
+	SUBNETS=$$(terraform -chdir=./terraform output -json ml_subnets | python3 -c 'import sys,json;print(",".join(json.load(sys.stdin)))'); \
+	SG=$$(terraform -chdir=./terraform output -raw ml_security_group_id); \
+	ARN=$$(aws ecs run-task --region $(ML_AWS_REGION) --cluster "$$CLUSTER" \
+	  --task-definition "$$FAMILY" --launch-type FARGATE \
+	  --network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
+	  --query 'tasks[0].taskArn' --output text); \
+	echo "started $$ARN"; \
+	aws ecs wait tasks-stopped --region $(ML_AWS_REGION) --cluster "$$CLUSTER" --tasks "$$ARN"; \
+	aws ecs describe-tasks --region $(ML_AWS_REGION) --cluster "$$CLUSTER" --tasks "$$ARN" \
+	  --query 'tasks[0].{exit:containers[0].exitCode,reason:stoppedReason}' --output json
+
+# Print the Mode Analytics connection details (password is sensitive).
+mode-connection:
+	@echo "host:     $$(terraform -chdir=./terraform output -raw analytics_db_endpoint)"
+	@echo "port:     $$(terraform -chdir=./terraform output -raw analytics_db_port)"
+	@echo "database: $$(terraform -chdir=./terraform output -raw analytics_db_name)"
+	@echo "user:     $$(terraform -chdir=./terraform output -raw analytics_mode_user)"
+	@echo "password: $$(terraform -chdir=./terraform output -raw analytics_mode_password)"
+	@echo "url:      $$(terraform -chdir=./terraform output -raw analytics_connection_url)"
+
+# Run bootstrap + MLflow/analytics connectivity checks as one-off ECS tasks.
+verify-integrations:
+	bash scripts/verify_integrations.sh all
+
 # Ray Serve inference + Go gRPC gateway (terraform/rpc_serving.tf)
 rpc-build:
 	docker build --platform linux/amd64 -f containers/ray_serve/Dockerfile -t $$(terraform -chdir=./terraform output -raw ray_serve_ecr_repository_url):$(ML_IMAGE_TAG) .

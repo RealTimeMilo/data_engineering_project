@@ -25,6 +25,7 @@ try:  # standard public location
 except ImportError:  # Ray 2.40 keeps the concrete aggs under _internal
     from ray.data._internal.aggregate import Count, Max, Mean, Min
 
+import analytics
 from config import (
     FEATURE_COLUMNS,
     FEATURES_PREFIX,
@@ -32,10 +33,12 @@ from config import (
     MAX_ROWS,
     PARQUET_PREFIX,
     RAY_OBJECT_STORE_BYTES,
+    RUN_ID,
     TEST_BUCKETS,
     VAL_BUCKETS,
     s3_uri,
 )
+from mlflow_utils import stage as mlflow_stage
 from utils import configure_logging, read_parquet, write_parquet
 
 logger = configure_logging("preprocess")
@@ -193,6 +196,22 @@ def main() -> None:
 
     ray.shutdown()
     logger.info("Preprocess complete.")
+
+    metrics = {
+        "candidate_rows": int(len(df)),
+        "train_rows": int(len(train_df)),
+        "val_rows": int(len(val_df)),
+        "test_rows": int(len(test_df)),
+        "positive_rate": float(df[LABEL_COLUMN].mean()),
+        "max_rows_cap": MAX_ROWS,
+    }
+    with mlflow_stage(
+        "preprocess",
+        params={"max_rows": MAX_ROWS, "features": ",".join(FEATURE_COLUMNS)},
+    ) as ml:
+        ml.log_metrics(metrics)
+    analytics.record_metrics(RUN_ID, "preprocess", metrics)
+    logger.info("Recorded preprocess metrics: %s", metrics)
 
 
 if __name__ == "__main__":

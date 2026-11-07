@@ -32,6 +32,7 @@ CONTAINER_NAME = Variable.get("ML_CONTAINER_NAME", default_var="ml-task")
 SUBNETS = Variable.get("ML_SUBNET_IDS", default_var="").split(",")
 SECURITY_GROUP = Variable.get("ML_SECURITY_GROUP", default_var="")
 AWS_REGION = Variable.get("ML_AWS_REGION", default_var="us-east-2")
+MLFLOW_EXPERIMENT = Variable.get("MLFLOW_EXPERIMENT_NAME", default_var="")
 
 TASK_DEFS = {
     "ingest": Variable.get("ML_TASK_DEF_INGEST", default_var="sde-airflow-dev-ml-ingest"),
@@ -66,6 +67,26 @@ default_args = {
 def ml_task(task_id: str, step: str, command: str, extra_env: list[dict]) -> EcsRunTaskOperator:
     """Launch one pipeline step as an ECS task with Airflow-templated overrides."""
     container = CONTAINERS.get(step, CONTAINER_NAME)
+
+    environment = [
+        # run_id is always defined (unlike ts_nodash, which needs
+        # a logical_date and is undefined for manual runs in
+        # Airflow 3). Sanitised so it is safe as an S3 key.
+        {
+            "name": "ML_RUN_ID",
+            "value": "{{ dag_run.run_id | replace(':', '-') | replace('+', '-') | replace('.', '-') }}",
+        },
+        # Kept unmodified for display: becomes the MLflow run name.
+        {"name": "MLFLOW_RUN_NAME", "value": "{{ dag_run.run_id }}"},
+        *extra_env,
+    ]
+    if MLFLOW_EXPERIMENT:
+        # Task-definition default comes from Terraform; this lets an operator
+        # point a run at a different experiment without a redeploy.
+        environment.append(
+            {"name": "MLFLOW_EXPERIMENT_NAME", "value": MLFLOW_EXPERIMENT}
+        )
+
     return EcsRunTaskOperator(
         task_id=task_id,
         aws_conn_id=AWS_CONN_ID,
@@ -87,16 +108,7 @@ def ml_task(task_id: str, step: str, command: str, extra_env: list[dict]) -> Ecs
                 {
                     "name": container,
                     "command": command,
-                    "environment": [
-                        # run_id is always defined (unlike ts_nodash, which needs
-                        # a logical_date and is undefined for manual runs in
-                        # Airflow 3). Sanitised so it is safe as an S3 key.
-                        {
-                            "name": "ML_RUN_ID",
-                            "value": "{{ dag_run.run_id | replace(':', '-') | replace('+', '-') | replace('.', '-') }}",
-                        },
-                        *extra_env,
-                    ],
+                    "environment": environment,
                 }
             ]
         },

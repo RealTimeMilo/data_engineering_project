@@ -1,5 +1,9 @@
 """
 Evaluate the trained booster on the held-out test split and persist metrics.
+
+Besides the S3 artifacts, this stage records the evaluation metrics to MLflow and
+publishes one row per scored (user, product) pair to the analytics Postgres that
+Mode Analytics reads.
 """
 
 import os
@@ -13,6 +17,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+import analytics
 from config import (
     FEATURE_COLUMNS,
     LABEL_COLUMN,
@@ -21,6 +26,7 @@ from config import (
     S3_BUCKET,
     s3_uri,
 )
+from mlflow_utils import stage as mlflow_stage
 from utils import configure_logging, download_file, read_parquet, write_json
 
 logger = configure_logging("evaluate")
@@ -61,9 +67,24 @@ def main() -> None:
         "pr_auc": float(average_precision_score(y, proba)),
         "accuracy": float(accuracy_score(y, (proba >= 0.5).astype(int))),
         "log_loss": float(log_loss(y, np.clip(proba, 1e-7, 1 - 1e-7))),
+        "mean_prediction": float(np.mean(proba)),
+        "best_iteration": int(booster.best_iteration or 0),
     }
     logger.info("Evaluation metrics: %s", metrics)
     write_json(S3_BUCKET, f"{MODELS_PREFIX}/{RUN_ID}/eval_metrics.json", metrics)
+
+    with mlflow_stage("evaluate", tags={"model_run": RUN_ID}) as ml:
+        ml.log_metrics(metrics)
+        ml.log_dict(metrics, "eval_metrics.json")
+
+    analytics.record_metrics(RUN_ID, "evaluate", metrics)
+    analytics.record_predictions(
+        RUN_ID,
+        user_ids=test_df["user_id"].to_numpy(),
+        product_ids=test_df["product_id"].to_numpy(),
+        labels=y.to_numpy(),
+        probabilities=proba,
+    )
     logger.info("Evaluation complete.")
 
 

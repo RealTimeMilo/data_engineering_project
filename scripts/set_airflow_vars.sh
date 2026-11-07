@@ -49,4 +49,7 @@ echo "Setting ML variables on $URL"
 upsert ML_SUBNET_IDS "$SUBNETS"
 upsert ML_SECURITY_GROUP "$SG"
 upsert ML_ECS_CLUSTER "$CLUSTER"
+if [ -n "${MLFLOW_EXPERIMENT_NAME:-}" ]; then
+  upsert MLFLOW_EXPERIMENT_NAME "$MLFLOW_EXPERIMENT_NAME"
+fi
 echo "Done."
